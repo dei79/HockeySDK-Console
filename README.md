@@ -12,7 +12,7 @@ Install-Package HockeySDK-Console
 Add the following app setting into the app.config 
 
 ```xml
-<add key="hockeyapp.appid" value="5d3179c84f59c017ee602664170a3fdd" />
+<add key="hockeyapp.appid" value="<<YOUR HOCKEYAPP ID>>" />
 ```
 
 After that just encapsulate the code fragment you want to observe as follows:
