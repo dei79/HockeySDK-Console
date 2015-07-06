@@ -57,6 +57,24 @@ namespace HockeyApp
             InitializeHockeyAppClient();
         }
 
+        /// <summary>
+        /// This constructor allows to set a specific package name and application identifier manually,
+        /// as well as to specify a custom location for recording of application crashes. No magic at all.
+        /// </summary>
+        /// <param name="packageName">Package Name (as recorded in HockeyApp)</param>
+        /// <param name="applicationId">Application ID as assigned by HockeyApp</param>
+        /// <param name="crashFileLocation">Directory path to location where crash files should be output to</param>
+        public ConsoleCrashHandler(String packageName, String applicationId, String crashFileLocation)
+        {
+            _packageName      = packageName;
+            _applicationId    = applicationId;
+
+            // If it so happens that crashFileLocation is null/empty-string, InitializeHockeyAppClient will set this to a default value
+            _crashFileLocaton = crashFileLocation;
+
+            InitializeHockeyAppClient();
+        }
+
         public void Dispose()
         {
             // disable the crash handler becase removing the delegate is currently
@@ -76,9 +94,12 @@ namespace HockeyApp
             HockeyClient.Configure(_applicationId, _packageVersion);
 
             // configure the location of crash dumps 
-            _crashFileLocaton   = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            _crashFileLocaton   = Path.Combine(_crashFileLocaton, Assembly.GetEntryAssembly().GetName().Name);
-            _crashFileLocaton   = Path.Combine(_crashFileLocaton, "HockeyCrashLogs");
+            if (string.IsNullOrEmpty(_crashFileLocaton))
+            {
+                _crashFileLocaton = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                _crashFileLocaton = Path.Combine(_crashFileLocaton, Assembly.GetEntryAssembly().GetName().Name);
+                _crashFileLocaton = Path.Combine(_crashFileLocaton, "HockeyCrashLogs"); 
+            }
 
             // add the crash handler
             AppDomain.CurrentDomain.UnhandledException += ExceptionHandler;
@@ -168,7 +189,7 @@ namespace HockeyApp
             }
             catch (Exception)
             { 
-                // Ignore all exceptions
+                // Ignore all other exceptions
             }
         }
     }
