@@ -17,6 +17,7 @@ namespace HockeyApp
         private String _crashFileLocaton { get; set; }
         private String _packageVersion { get; set; }
         private Boolean _disposed { get; set; }
+        private IAppCrashNotifier _appCrashNotifier { get; set; }
 
         /// <summary>
         /// The default constructor reads the basic information per reflection from the assembly as self and the 
@@ -59,18 +60,22 @@ namespace HockeyApp
 
         /// <summary>
         /// This constructor allows to set a specific package name and application identifier manually,
-        /// as well as to specify a custom location for recording of application crashes. No magic at all.
+        /// as well as to specify a custom location for recording of application crashes, and an object implementation
+        /// that notifies a user on subsequent launch that there is crash data to be logged. No magic at all.
         /// </summary>
         /// <param name="packageName">Package Name (as recorded in HockeyApp)</param>
         /// <param name="applicationId">Application ID as assigned by HockeyApp</param>
         /// <param name="crashFileLocation">Directory path to location where crash files should be output to</param>
-        public ConsoleCrashHandler(String packageName, String applicationId, String crashFileLocation)
+        /// <param name="appCrashNotifier">Object implementation advising user in next application session of crash data to be uploaded</param>
+        public ConsoleCrashHandler(String packageName, String applicationId, String crashFileLocation, IAppCrashNotifier appCrashNotifier)
         {
             _packageName      = packageName;
             _applicationId    = applicationId;
 
             // If it so happens that crashFileLocation is null/empty-string, InitializeHockeyAppClient will set this to a default value
             _crashFileLocaton = crashFileLocation;
+
+            _appCrashNotifier = appCrashNotifier;
 
             InitializeHockeyAppClient();
         }
@@ -120,27 +125,32 @@ namespace HockeyApp
                 return true;
             }
 
-            // 
-            // Visit every file and send to the backend
-            foreach (string filename in Directory.GetFiles(_crashFileLocaton, "*.log"))
-            {
-                try
-                {
-                    FileStream fs = File.OpenRead(filename);
-                    ICrashData cd = HockeyClient.Instance.Deserialize(fs);
-                    fs.Close();
-                    cd.SendDataAsync().Wait();
-                    File.Delete(filename);
-                }
-                catch (Exception)
-                {
-                    // create a failed report list if needed
-                    if (failedReports == null)
-                        failedReports = new List<string>();
+            var files = Directory.GetFiles(_crashFileLocaton, "*.log");
 
-                    // add the missing report
-                    failedReports.Add(filename);
-                }
+            if ((files != null) && (files.GetLength(0) > 0) && ((_appCrashNotifier == null) || (_appCrashNotifier.ConfirmUploadCrashData())))
+            {
+                // 
+                // Visit every file and send to the backend
+                foreach (string filename in files)
+                {
+                    try
+                    {
+                        FileStream fs = File.OpenRead(filename);
+                        ICrashData cd = HockeyClient.Instance.Deserialize(fs);
+                        fs.Close();
+                        cd.SendDataAsync().Wait();
+                        File.Delete(filename);
+                    }
+                    catch (Exception)
+                    {
+                        // create a failed report list if needed
+                        if (failedReports == null)
+                            failedReports = new List<string>();
+
+                        // add the missing report
+                        failedReports.Add(filename);
+                    }
+                } 
             }
             
             // done
